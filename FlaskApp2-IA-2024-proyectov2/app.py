@@ -23,21 +23,6 @@ def inicializar():
     G_lima = ox.load_graphml('../lima_moderna2.graphml')
     return G_lima
 
-def defineCoordsCentrals(uniqueEdges):
-    coordinates = []
-
-    for edge in G.edges:
-        node1, node2 = edge[0], edge[1]
-        uniqueEdges.append((node1, node2))
-        x1, y1 = transformNodeToCoordenates(node1)
-        #Longitud y Latitud
-        x2, y2 = transformNodeToCoordenates(node2) 
-        coordinates.append(((y1+y2)/2, (x1+x2)/2))  # Coord Central
-    return coordinates
-
-
-
-
 def defineDayHour():
     now = datetime.now()
     dia = now.strftime("%A")  # Día de la semana
@@ -78,7 +63,6 @@ def astar(G, start, goal):
     came_from = {}
     g_costs = {start: 0}
     f_costs = {start: heuristic(start, goal, G)}
-    unique = []
     
     path = []
     while open_list:
@@ -102,7 +86,7 @@ def astar(G, start, goal):
                 f_costs[neighbor] = tentative_g_cost
                 heapq.heappush(open_list, (f_costs[neighbor], neighbor))
         
-    return path[::-1], g_costs[goal], unique
+    return path[::-1], g_costs[goal]
 
 def transformNodeToCoordenates(node):
     return (G.nodes[node]['y'], G.nodes[node]['x'])
@@ -213,8 +197,4 @@ def mostrar_mapa():
 
 if __name__ == '__main__':
     G = inicializar()
-    uniqueEdges = []
-    coordinatesCentrals = defineCoordsCentrals(uniqueEdges)
-    getCongestion = {}
-    getCongestion_Edge = {}
     app.run(debug=True)
