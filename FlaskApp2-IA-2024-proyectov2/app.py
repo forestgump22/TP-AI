@@ -222,16 +222,17 @@ def heuristic(node1, node2, G):
     return haversine(x1, y1, x2, y2)
 
 def smastar(G, start, goal):
-    open_list = []
-    heapq.heappush(open_list, (0, start))
+    ipq = IndexedPQ(lambda a,b : a<b)
+    ipq.insert(start,0)
     
     came_from = {}
     g_costs = {start: 0}
     f_costs = {start: heuristic(start, goal, G)}
     
     path = []
-    while open_list:
-        current = heapq.heappop(open_list)[1]
+    while ipq.size > 0:
+        current = ipq.peekMinKeyIndex()
+        ipq.pollMinKeyIndex()
         
         if current == goal:
             while current in came_from:
@@ -243,15 +244,13 @@ def smastar(G, start, goal):
         for neighbor in G.neighbors(current):
             distance = heuristic(current, neighbor, G)
 
-            
             try:
                 edge_data = G.get_edge_data(current, neighbor)
                 if edge_data is None:
                     continue
                     
-                if isinstance(edge_data, dict):
-                    if 0 in edge_data:
-                        edge_data = edge_data[0]
+                if isinstance(edge_data, dict) and 0 in edge_data:
+                    edge_data = edge_data[0]
                 
                 road_name = ""
                 if "name" in edge_data:
@@ -266,7 +265,7 @@ def smastar(G, start, goal):
                     midpoint_lon = (G.nodes[current]["x"] + G.nodes[neighbor]["x"]) / 2
                     day, time_minutes = getDayAndTimeMin()
                     congestion = predict_congestion(day, time_minutes, midpoint_lat, midpoint_lon)
-                    # estamos aumentando la distancia para que el sma* nos lleve por el camino con menos congestion digamosle
+                    # estamos aumentando la distancia para que el sma* nos lleve por el camino con menos congestion
                     distance *= 1 + (congestion / 100) * 0.2
                 else: distance *= 1 + (10/100)*0.2 
 
@@ -274,13 +273,16 @@ def smastar(G, start, goal):
                 print(f"Error processing edge {current}->{neighbor}: {str(e)}")
                 continue
             
-            tentative_g_cost = g_costs[current] + distance
+            newDist = g_costs[current] + distance
             
-            if neighbor not in g_costs or tentative_g_cost < g_costs[neighbor]:
+            if neighbor not in g_costs or newDist < g_costs[neighbor]:
                 came_from[neighbor] = current
-                g_costs[neighbor] = tentative_g_cost
-                f_costs[neighbor] = tentative_g_cost + heuristic(neighbor, goal, G)
-                heapq.heappush(open_list, (f_costs[neighbor], neighbor))
+                g_costs[neighbor] = newDist
+                f_costs[neighbor] = newDist + heuristic(neighbor, goal, G)
+                if not ipq.contains(neighbor):
+                    ipq.insert(neighbor, f_costs[neighbor])
+                else: 
+                    ipq.decreaseKey(neighbor, f_costs[neighbor])
     
     return [], 0
 
