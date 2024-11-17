@@ -3,45 +3,107 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Calculadora de Rutas</title>
+    <title>Calculadora de Rutas Lima</title>
     <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
       rel="stylesheet"
     />
-    <style>
-      /* Aquí van los mismos estilos que antes */
-    </style>
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <link href="../static/index.css" rel="stylesheet" />
   </head>
   <body>
     <header>
-      <h1>Calculadora de Rutas</h1>
+      <h1>Rutas UPC</h1>
+      <p>Encuentra la mejor ruta entre dos sedes de la UPC :D</p>
     </header>
 
-    <div class="form-container">
-      <h2>Ingrese los puntos de inicio y fin</h2>
-      <form method="POST">
-        <div>
-          <label for="direccion_inicio">Dirección de Inicio:</label>
-          <input
-            type="text"
-            id="direccion_inicio"
-            name="direccion_inicio"
-            required
-          />
+    <div class="container">
+      <div class="form-container">
+        {% if error_message %}
+        <div class="error-message">{{ error_message }}</div>
+        {% endif %}
+
+        <form method="POST" action="/" id="routeForm">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="start">Punto de inicio</label>
+              <div class="input-with-icon">
+                <input
+                  type="text"
+                  id="start"
+                  name="start"
+                  required
+                  value="{{ request.form.get('start', '') }}"
+                />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="end">Punto final</label>
+              <div class="input-with-icon">
+                <input
+                  type="text"
+                  id="end"
+                  name="end"
+                  required
+                  value="{{ request.form.get('end', '') }}"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="departure_time">Hora de salida</label>
+            <input
+              type="datetime-local"
+              id="departure_time"
+              name="departure_time"
+              value="{{ request.form.get('departure_time', '') }}"
+            />
+          </div>
+
+          {% if route_info %}
+          <div class="route-info">
+            <h3>Información de la ruta:</h3>
+            <p>Distancia total: {{ route_info.total_distance }} km</p>
+            <p>Tiempo estimado: {{ route_info.total_time }} minutos</p>
+            <p>Hora de salida: {{ route_info.departure_time }}</p>
+            <p>Hora estimada de llegada: {{ route_info.arrival_time }}</p>
+          </div>
+          {% endif %}
+
+          <div class="form-group" style="text-align: center">
+            <button type="submit" class="btn">Calcular Ruta</button>
+          </div>
+        </form>
+
+        <div class="upc-locations">
+          <h3>Sedes UPC disponibles:</h3>
+          <ul>
+            <li onclick="fillLocation(this.textContent)">UPC San Isidro</li>
+            <li onclick="fillLocation(this.textContent)">UPC San Miguel</li>
+            <li onclick="fillLocation(this.textContent)">UPC Monterrico</li>
+            <li onclick="fillLocation(this.textContent)">UPC Villa</li>
+          </ul>
         </div>
-        <div>
-          <label for="direccion_fin">Dirección de Fin:</label>
-          <input type="text" id="direccion_fin" name="direccion_fin" required />
+      </div>
+
+      <div class="map-container">
+        {% if map_html %} {{ map_html|safe }} {% else %}
+        <div style="text-align: center; padding: 2rem">
+          Ingrese un punto de inicio y final para calcular la ruta
         </div>
-        <div>
-          <button type="submit">Calcular Ruta</button>
-        </div>
-      </form>
+        {% endif %}
+      </div>
     </div>
 
-    <div class="map-container">
-      <h2>Ruta Calculada:</h2>
-      <div>{{ map_html|safe }}</div>
+    <div id="loadingOverlay" class="loading-overlay">
+      <div class="loading-spinner">Calculando la mejor ruta...</div>
     </div>
+
+    <script src="../static/js/script.js"></script>
   </body>
 </html>
