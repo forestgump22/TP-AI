@@ -12,6 +12,7 @@ import torch.nn as nn
 import os
 import joblib
 import pandas as pd
+from collections import defaultdict
 from sklearn.preprocessing import StandardScaler
 from shapely.geometry import Point
 from geopy.geocoders import Nominatim
@@ -64,12 +65,26 @@ calles_principales = [
 ]
 
 def predict_congestion(day, time_minutes, lat, lon):
+    day_mapping = {
+        0: 1,  # Lunes -> 1
+        1: 4,  # Martes -> 4
+        2: 5,  # Miércoles -> 5
+        3: 3,  # Jueves -> 3
+        4: 0,  # Viernes -> 0
+        5: 2,  # Sábado -> No entrenado el modelo para predecir el dia sabado, los demas dias si, pondremos 2 para que lo suponga como dia fuera de dias de trabajo
+        6: 2   # Domingo -> 2 segun como se tranformo los datos al inicio para el modelo
+    }
+    # print(label_encoder.classes_)
+    # ['Friday' 'Monday' 'Sunday' 'Thursday' 'Tuesday' 'Wednesday']
+    # Prediccion soportada durante el dia, no durante la noche
+    day = day_mapping.get(day, day)  # Convertir día según mapeo
+    
     feature_names = ['Dia', 'Hora', 'Latitud Central', 'Longitud Central']
     
     X = pd.DataFrame([[day, time_minutes, lat, lon]], 
                     columns=feature_names)
     X_norm = scaler_X.transform(X)
-    X_tensor = torch.tensor(X_norm, dtype=torch.float32)
+    X_tensor = torch.tensor(X_norm, dtype = torch.float32)
 
     y_pred = traffic_model(X_tensor).detach().numpy()
     y_denorm = scaler_y.inverse_transform(y_pred)[0][0]  
@@ -104,6 +119,90 @@ def calculate_little_time(distance_km, congestion):
         congestion = 8.5 / pow(1.3,(congestion/8.5))
     return (distance_km / congestion ) * 60
 
+
+class IndexedPQ:
+    def __init__(self,comp):
+        self.comp = comp;
+        self.size = 0;
+        self.values = defaultdict();
+        self.pm = defaultdict(int);
+        self.im = defaultdict();
+        
+    def insert(self,ki,value):
+        self.values[ki] = value;
+        self.pm[ki] = self.size;
+        self.im[self.size] = ki;
+        
+        self.size += 1;
+        if self.size <= 1:
+            return;
+        i = self.size-1;
+        parent = (i-1)//2;
+        self.swim(i,parent);
+    
+    def __compa(self,i,j):
+        return (self.comp(self.values[self.im[i]],
+            self.values[self.im[j]]));
+    def contains(self,ki):
+        return self.pm.get(ki,-1) != -1;
+    def peekMinKeyIndex(self):
+        return self.im[0];
+    def pollMinKeyIndex(self):
+        minki=self.peekMinKeyIndex();
+        return  self.remove(minki);
+    def swim(self,i,parent):
+        while parent>=0 and self.__compa(i,parent):
+            self.__swap(i,parent);
+            if parent==0:
+                return;
+            i=parent;
+            parent=(i-1)//2;
+    def __swap(self,i,j):
+        self.pm[self.im[i]]=j;
+        self.pm[self.im[j]]=i;
+        self.im[i],self.im[j]=self.im[j],self.im[i];
+    
+    def __sink(self,i):
+        while (i < (self.size-1)//2):
+            left  = i*2+1;
+            right = i*2+2;
+            if self.__compa(left, i) or self.__compa(right, i):
+                if self.__compa(right, left):
+                    self.__swap(right, i);
+                    i = right;
+                else:
+                    self.__swap(left, i);
+                    i = left;
+            else: break;
+        
+    def remove(self,ki):
+        if self.size == 0:
+            return None;
+        i = self.pm[ki];
+        removeElement = self.values[ki];
+        self.__swap(i,self.size-1);
+        self.size -= 1;
+        self.__sink(i);
+        parent = (i-1)//2;
+        self.swim(i,parent);
+        self.values[ki] = -1;
+        self.pm[ki] = -1;
+        self.im[self.size] = -1;
+        return removeElement;
+    
+    def update(self,ki,value):
+        i = self.pm[ki];
+        self.values[ki] = value;
+        self.__sink(i);
+        parent = (i-1)//2;
+        self.swim(i,parent);
+    
+    #just use it when it is a MinIndexed PriorityQueue
+    def decreaseKey(self,key,value):
+        if self.comp(value,self.values[key]):
+            self.values[key] = value;
+            parent = (self.pm[key]-1)//2;
+            self.swim(self.pm[key],parent);
 
 def haversine(lon1, lat1, lon2, lat2):
     R = 6371
