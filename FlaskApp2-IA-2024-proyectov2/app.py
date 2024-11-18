@@ -222,6 +222,7 @@ def heuristic(node1, node2, G):
     return haversine(x1, y1, x2, y2)
 
 def smastar(G, start, goal):
+    max_size = 100
     ipq = IndexedPQ(lambda a,b : a<b)
     ipq.insert(start,0)
     
@@ -283,6 +284,9 @@ def smastar(G, start, goal):
                     ipq.insert(neighbor, f_costs[neighbor])
                 else: 
                     ipq.decreaseKey(neighbor, f_costs[neighbor])
+            
+            if ipq.size > max_size:
+                pass
     
     return [], 0
 
@@ -476,4 +480,4 @@ def mostrar_mapa():
 
 if __name__ == '__main__':
     print("Feature names used in training:", scaler_X.feature_names_in_)
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
