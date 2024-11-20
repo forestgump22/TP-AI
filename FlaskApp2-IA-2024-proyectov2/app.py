@@ -119,26 +119,120 @@ def calculate_little_time(distance_km, congestion):
         congestion = 8.5 / pow(1.3,(congestion/8.5))
     return (distance_km / congestion ) * 60
 
+class MapHeap:
+    def __init__(self):
+        self.heap=[];
+        self.key_to_value=defaultdict();  
+        self.key_to_index=defaultdict();  
+
+    def __len__(self):
+        return len(self.heap);
+
+    def is_empty(self):
+        return len(self.heap)==0;
+
+    def insert(self, key, value):
+        if key in self.key_to_value:
+            self.update(key, value);
+            return;
+        self.key_to_value[key]=value;
+        self.heap.append(key);
+        self.key_to_index[key]=len(self.heap) - 1;
+        self._swim(len(self.heap) - 1);
+
+    def get_max(self):
+        if self.is_empty():
+            return None, None;
+        max_key=self.heap[0];
+        return max_key,self.key_to_value[max_key];
+
+    def poll_max(self):
+        if self.is_empty():
+            return None;
+        max_key=self.heap[0];
+        max_value=self.key_to_value[max_key];
+        self._swap(0, len(self.heap)-1);
+        self.heap.pop();  
+        del self.key_to_value[max_key];
+        del self.key_to_index[max_key];
+        if not self.is_empty():
+            self._sink(0);  
+        return max_key, max_value;
+
+    def update(self, key, new_value):
+        if key not in self.key_to_value:
+            raise ValueError("Key not found.", key);
+        old_value=self.key_to_value[key];
+        self.key_to_value[key]=new_value;
+        index=self.key_to_index[key];
+        if new_value > old_value:
+            self._swim(index);
+        else:
+            self._sink(index);
+
+    def remove(self, key):
+        if key not in self.key_to_value:
+            raise ValueError("Key not found.", key);
+        index = self.key_to_index[key];
+        self._swap(index,len(self.heap)-1); 
+        self.heap.pop();
+        del self.key_to_value[key];
+        del self.key_to_index[key];
+        if index < len(self.heap): 
+            self._sink(index);
+            self._swim(index);
+
+    def _swim(self, index):
+        while index > 0:
+            parent=(index - 1) // 2
+            if self.key_to_value[self.heap[index]] > self.key_to_value[self.heap[parent]]:
+                self._swap(index, parent)
+                index=parent;
+            else:
+                break;
+
+    def _sink(self, index):
+        size = len(self.heap);
+        while 2 * index + 1 < size:
+            left    = 2 * index + 1;
+            right   = 2 * index + 2;
+            largest = left;
+            if right < size and self.key_to_value[self.heap[right]] > self.key_to_value[self.heap[left]]:
+                largest = right;
+            if self.key_to_value[self.heap[index]] < self.key_to_value[self.heap[largest]]:
+                self._swap(index, largest);
+                index = largest;
+            else:
+                break;
+
+    def _swap(self, i, j):
+        self.heap[i], self.heap[j] = self.heap[j], self.heap[i];
+        self.key_to_index[self.heap[i]] = i;
+        self.key_to_index[self.heap[j]] = j;
 
 class IndexedPQ:
     def __init__(self,comp):
         self.comp = comp;
         self.size = 0;
         self.values = defaultdict();
-        self.pm = defaultdict(int);
+        self.pm = defaultdict();
         self.im = defaultdict();
-        
+        self.maxheap = MapHeap();
+    
     def insert(self,ki,value):
+        if ki in self.values:
+            self.update(ki, value);
+            return;
         self.values[ki] = value;
         self.pm[ki] = self.size;
         self.im[self.size] = ki;
-        
+        self.maxheap.insert(ki, value);
         self.size += 1;
         if self.size <= 1:
             return;
         i = self.size-1;
         parent = (i-1)//2;
-        self.swim(i,parent);
+        ki = self.swim(i, parent);
     
     def __compa(self,i,j):
         return (self.comp(self.values[self.im[i]],
@@ -147,16 +241,22 @@ class IndexedPQ:
         return self.pm.get(ki,-1) != -1;
     def peekMinKeyIndex(self):
         return self.im[0];
+    def peekMaxKeyIndex(self):
+        return self.im[self.size - 1 ];
     def pollMinKeyIndex(self):
         minki=self.peekMinKeyIndex();
         return  self.remove(minki);
-    def swim(self,i,parent):
+    def pollMaxKeyIndex(self):
+        maxkey, _ =self.maxheap.poll_max();
+        self.remove(maxkey);
+    
+    def swim(self, i, parent):
         while parent>=0 and self.__compa(i,parent):
             self.__swap(i,parent);
-            if parent==0:
-                return;
             i=parent;
             parent=(i-1)//2;
+        return self.im[i];
+    
     def __swap(self,i,j):
         self.pm[self.im[i]]=j;
         self.pm[self.im[j]]=i;
@@ -173,21 +273,23 @@ class IndexedPQ:
                 else:
                     self.__swap(left, i);
                     i = left;
-            else: break;
-        
+            else: return self.im[i];
+    
     def remove(self,ki):
-        if self.size == 0:
+        if ki not in self.pm:
             return None;
         i = self.pm[ki];
         removeElement = self.values[ki];
         self.__swap(i,self.size-1);
         self.size -= 1;
-        self.__sink(i);
-        parent = (i-1)//2;
-        self.swim(i,parent);
-        self.values[ki] = -1;
-        self.pm[ki] = -1;
-        self.im[self.size] = -1;
+        if i < self.size:
+            self.__sink(i);
+            parent = (i-1)//2;
+            self.swim(i,parent);
+        del self.values[ki]
+        del self.pm[ki]
+        del self.im[self.size]
+        self.maxheap.remove(ki)
         return removeElement;
     
     def update(self,ki,value):
@@ -200,9 +302,12 @@ class IndexedPQ:
     #just use it when it is a MinIndexed PriorityQueue
     def decreaseKey(self,key,value):
         if self.comp(value,self.values[key]):
+            self.maxheap.update(key, value);
+            i = self.pm[key];
             self.values[key] = value;
-            parent = (self.pm[key]-1)//2;
-            self.swim(self.pm[key],parent);
+            parent = (i-1)//2;
+            self.swim(i,parent);
+        
 
 def haversine(lon1, lat1, lon2, lat2):
     R = 6371
@@ -222,7 +327,7 @@ def heuristic(node1, node2, G):
     return haversine(x1, y1, x2, y2)
 
 def smastar(G, start, goal):
-    max_size = 100
+    max_size = 1600 #basado en la cantidad aproximada de nodos necesarios para ir de Monterrico a San Miguel!
     ipq = IndexedPQ(lambda a,b : a<b)
     ipq.insert(start,0)
     
@@ -286,7 +391,7 @@ def smastar(G, start, goal):
                     ipq.decreaseKey(neighbor, f_costs[neighbor])
             
             if ipq.size > max_size:
-                pass
+                ipq.pollMaxKeyIndex(); #se uso a dentro un mapa tipo c++ pero en python y con heap[] para tener realmente el mayor valor de todos los nodos. Y lo eliminamos del ipq y del heap max interno.
     
     return [], 0
 
